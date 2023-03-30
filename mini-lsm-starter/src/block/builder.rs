@@ -35,12 +35,12 @@ impl BlockBuilder {
         self.block_data.put(key);
         self.block_data.put_u16(value.len() as u16);
         self.block_data.put(value);
-        return true;
+        true
     }
 
     /// Check if there is no key-value pair in the block.
     pub fn is_empty(&self) -> bool {
-        return self.offset_vec.is_empty();
+        self.offset_vec.is_empty()
     }
 
     /// Finalize the block.
