@@ -4,8 +4,10 @@
 mod builder;
 mod iterator;
 
+pub const SIZE_OF_U16: usize = std::mem::size_of::<u16>();
+
 pub use builder::BlockBuilder;
-use bytes::Bytes;
+use bytes::{Buf, BufMut, Bytes};
 pub use iterator::BlockIterator;
 
 /// A block is the smallest unit of read and caching in LSM tree. It is a collection of sorted
@@ -17,52 +19,27 @@ pub struct Block {
 
 impl Block {
     pub fn encode(&self) -> Bytes {
-        // num : num of elements
-        // offset array : each entry's offset
-        // entry_array : each entry's data
-        let mut buf = Vec::new();
-        // format the entry array
-        buf.extend_from_slice(&self.data);
-        // format the offset array
+        let mut buf = self.data.clone();
+        let offsets_len = self.offsets.len();
         for offset in &self.offsets {
-            buf.extend_from_slice(&offset.to_be_bytes());
+            buf.put_u16(*offset);
         }
-        let num_of_elements = self.offsets.len() as u16;
-        // format the num of elements
-        buf.extend_from_slice(&num_of_elements.to_be_bytes());
-        println!(
-            "encode buf size is {} entry_size is {} num is {}",
-            buf.len(),
-            self.data.len(),
-            num_of_elements
-        );
-        return Bytes::copy_from_slice(&buf);
+        buf.put_u16(offsets_len as u16);
+        buf.into()
     }
 
     pub fn decode(data: &[u8]) -> Self {
-        // the num of elements is the last two character in data
-        let num_of_elements = u16::from_be_bytes([data[data.len() - 2], data[data.len() - 1]]);
-        println!(
-            "num of elements: {} data_size {}",
-            num_of_elements,
-            data.len()
-        );
-        let entry_array_size = data.len() - num_of_elements as usize * 2 - 2;
-        println!("entry array size: {}", entry_array_size);
-        let mut offset_array = Vec::new();
-
-        for i in 0..num_of_elements {
-            let offset = u16::from_be_bytes([
-                data[entry_array_size + i as usize * 2],
-                data[entry_array_size + i as usize * 2 + 1],
-            ]);
-            println!("offset: {}", offset);
-            offset_array.push(offset);
-        }
-        return Self {
-            data: data[..entry_array_size].to_vec(),
-            offsets: offset_array,
-        };
+        let num_of_elements = (&data[data.len() - SIZE_OF_U16..]).get_u16() as usize;
+        // it's the end of data , and also the beginning of the offest array
+        let data_len = data.len() - SIZE_OF_U16 - SIZE_OF_U16 * num_of_elements;
+        // don't  forget the `num of elements`
+        let offsets_array_raw = &data[data_len..data.len() - SIZE_OF_U16];
+        let offsets = offsets_array_raw
+            .chunks(SIZE_OF_U16)
+            .map(|mut x| x.get_u16())
+            .collect();
+        let data = data[0..data_len].to_vec();
+        Self { data, offsets }
     }
 }
 
