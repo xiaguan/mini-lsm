@@ -16,7 +16,7 @@ impl BlockBuilder {
         }
     }
 
-    fn current_size(&self) -> usize {
+    pub fn current_size(&self) -> usize {
         // offset array , num of elements, data
         self.offset_vec.len() * SIZE_OF_U16 + SIZE_OF_U16 + self.block_data.len()
     }

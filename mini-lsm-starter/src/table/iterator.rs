@@ -3,33 +3,67 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 
-use super::SsTable;
+use super::{Block, SsTable};
 use crate::iterators::StorageIterator;
 
 /// An iterator over the contents of an SSTable.
-pub struct SsTableIterator {}
+pub struct SsTableIterator {
+    table: Arc<SsTable>,
+    block: Arc<Block>,
+    idx: usize,
+}
 
 impl SsTableIterator {
     /// Create a new iterator and seek to the first key-value pair.
     pub fn create_and_seek_to_first(table: Arc<SsTable>) -> Result<Self> {
-        unimplemented!()
+        match table.read_block(0) {
+            Ok(block) => {
+                return Ok(SsTableIterator {
+                    table,
+                    block,
+                    idx: 0,
+                })
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        }
     }
 
     /// Seek to the first key-value pair.
     pub fn seek_to_first(&mut self) -> Result<()> {
-        unimplemented!()
+        if self.table.num_of_blocks() == 0 {
+            return Err(Error::msg("the table size is 0"));
+        }
+        self.block = self.table.read_block(0).unwrap();
+        Ok(())
     }
 
     /// Create a new iterator and seek to the first key-value pair which >= `key`.
     pub fn create_and_seek_to_key(table: Arc<SsTable>, key: &[u8]) -> Result<Self> {
-        unimplemented!()
+        let match_idx = table.find_block_idx(key);
+        match table.read_block(match_idx) {
+            Ok(block) => Ok(SsTableIterator {
+                table,
+                block,
+                idx: match_idx,
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     /// Seek to the first key-value pair which >= `key`.
     pub fn seek_to_key(&mut self, key: &[u8]) -> Result<()> {
-        unimplemented!()
+        let match_idx = self.table.find_block_idx(key);
+        match self.table.read_block(match_idx) {
+            Ok(block) => {
+                self.block = block;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
     }
 }
 
